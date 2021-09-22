@@ -1,88 +1,112 @@
-package dcdc200
+/* 
+MIT License
+
+Copyright (c) 2021 Justin Hammond
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+package dcdcusb
 
 const (
-	DCDC200_VID = 0x04d8
-	DCDC200_PID = 0xd003
+	dcdc200_vid = 0x04d8
+	dcdc200_pid = 0xd003
 )
 
 const (
-	StatusOK    = 0x00
-	StatusErase = 0x01
-	StatusWrite = 0x02
-	StatusRead  = 0x03
-	StatusError = 0xFF
+	statusOK    = 0x00
+	statusErase = 0x01
+	statusWrite = 0x02
+	statusRead  = 0x03
+	statusError = 0xFF
 )
 
 const (
-	CmdGetAllValues  = 0x81
-	CmdRecvAllValues = 0x82
-	CmdOut           = 0xB1
-	CmdIn            = 0xB2
-	CmdReadOut       = 0xA1
-	CmdReadIn        = 0xA2
-	CmdWriteOut      = 0xA3
-	CmdWriteIn       = 0xA4
-	CmdErase         = 0xA5
+	cmdGetAllValues  = 0x81
+	cmdRecvAllValues = 0x82
+	cmdOut           = 0xB1
+	cmdIn            = 0xB2
+	cmdReadOut       = 0xA1
+	cmdReadIn        = 0xA2
+	cmdWriteOut      = 0xA3
+	cmdWriteIn       = 0xA4
+	cmdErase         = 0xA5
 )
 
 const (
-	MsgInternal             = 0xFF
-	MsgInternalDisconnected = 0x01
+	msgInternal             = 0xFF
+	msgInternalDisconnected = 0x01
 )
 
 const (
-	CmdSetAuxWin         = 0x01
-	CmdSetPwSwitch       = 0x02
-	CmdSetOutput         = 0x03
-	CmdWriteVout         = 0x06
-	CmdReadVout          = 0x07
-	CmdIncVout           = 0x0C
-	CmdDecVout           = 0x0D
-	CmdLoadDefaults      = 0x0E
-	CmdScriptStart       = 0x10
-	CmdScriptStop        = 0x11
-	CmdSleep             = 0x12
-	CmdReadRegulatorStep = 0x13
+	cmdSetAuxWin         = 0x01
+	cmdSetPwSwitch       = 0x02
+	cmdSetOutput         = 0x03
+	cmdWriteVout         = 0x06
+	cmdReadVout          = 0x07
+	cmdIncVout           = 0x0C
+	cmdDecVout           = 0x0D
+	cmdLoadDefaults      = 0x0E
+	cmdScriptStart       = 0x10
+	cmdScriptStop        = 0x11
+	cmdSleep             = 0x12
+	cmdReadRegulatorStep = 0x13
 )
 
 const (
-	TypeCodeMemory     = 0x00
-	TypeEepromExternal = 0x01
-	TypeEepromInternal = 0x02
-	TypeCodeSplash     = 0x03
+	typeCodeMemory     = 0x00
+	typeEepromExternal = 0x01
+	typeEepromInternal = 0x02
+	typeCodeSplash     = 0x03
 )
 
 const (
-	FlashReportEraseMemory = 0xF2 /* AddressLo : AddressHi : AddressUp (anywhere inside the 64 byte-block to be erased) */
-	FlashReportReadMemory  = 0xF3 /* AddressLo : AddressHi : AddressUp : Data Length (1...32) */
-	FlashReportWriteMemory = 0xF4 /* AddressLo : AddressHi : AddressUp : Data Length (1...32) : Data.... */
-	KeyBdReportEraseMemory = 0xB2 /* same as F2 but in keyboard mode */
-	KeybdReportReadMemory  = 0xB3 /* same as F3 but in keyboard mode */
-	KeybdReportWriteMemory = 0xB4 /* same as F4 but in keyboard mode */
-	KeybdReportMemory      = 0x41 /* response to b3,b4 */
+	flashReportEraseMemory = 0xF2 /* AddressLo : AddressHi : AddressUp (anywhere inside the 64 byte-block to be erased) */
+	flashReportReadMemory  = 0xF3 /* AddressLo : AddressHi : AddressUp : Data Length (1...32) */
+	flashReportWriteMemory = 0xF4 /* AddressLo : AddressHi : AddressUp : Data Length (1...32) : Data.... */
+	keyBdReportEraseMemory = 0xB2 /* same as F2 but in keyboard mode */
+	keybdReportReadMemory  = 0xB3 /* same as F3 but in keyboard mode */
+	keybdReportWriteMemory = 0xB4 /* same as F4 but in keyboard mode */
+	keybdReportMemory      = 0x41 /* response to b3,b4 */
 )
 
 const (
-	InReportExtEEData   = 0x31
-	OutReportExtEERead  = 0xA1
-	OutReportExtEEWrite = 0xA2
-	InReportIntEEData   = 0x32
-	OutReportIntEERead  = 0xA3
-	OutReportIntEEWrite = 0xA4
+	inReportExtEEData   = 0x31
+	outReportExtEERead  = 0xA1
+	outReportExtEEWrite = 0xA2
+	inReportIntEEData   = 0x32
+	outReportIntEERead  = 0xA3
+	outReportIntEEWrite = 0xA4
 )
 
 /* MEASUREMENT CONSTANTS */
 
 const (
-	CT_RW = 75
-	CT_R1 = 49900
-	CT_R2 = 1500
-	CT_RP = 10000
+	ct_RW = 75
+	ct_R1 = 49900
+	ct_R2 = 1500
+	ct_RP = 10000
 )
 
-const CHECK_CHAR = 0xAA /* used for line/write check */
+const check_char = 0xAA /* used for line/write check */
 
-const MAX_MESSAGE_CNT = 64
+const max_message_cnt = 64
 
 //go:generate stringer -type=DcdcModet
 type DcdcModet int
