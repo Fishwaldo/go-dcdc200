@@ -1,4 +1,12 @@
-on: [ push, pull_request ]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  # Goreadme needs permissions to update pull requests comments and change contents.
+  pull-requests: write
+  contents: write
 name: Build
 jobs:
     test:
@@ -13,14 +21,13 @@ jobs:
                 uses: actions/setup-go@v1
                 with:
                     go-version: ${{ matrix.go-version }}
-            -   name: Install libusb-1.0-0-dev
-                run: sudo apt-get install libusb-1.0-0-dev
             -   name: Checkout code
                 uses: actions/checkout@v1
+            -   name: Install libusb-1.0-0-dev
+                run: sudo apt-get install libusb-1.0-0-dev    
             -   name: Run tests
-                run: go test -v -race
-
-    coverage:
+                run: go test -v -race ./...
+    codecov:
         runs-on: ubuntu-latest
         needs: test
         steps:
@@ -29,11 +36,38 @@ jobs:
                 uses: actions/setup-go@v1
                 with:
                     go-version: 1.16.x
-            -   name: Install libusb-1.0-0-dev
-                run: sudo apt-get install libusb-1.0-0-dev
             -   name: Checkout code
                 uses: actions/checkout@v1
+            -   name: Install libusb-1.0-0-dev
+                run: sudo apt-get install libusb-1.0-0-dev
             -   name: Run tests
-                run: go test -v -race -covermode=atomic -coverprofile=coverage.txt
-            -   name: Upload coverage to Codecov
-                run: bash <(curl -s https://codecov.io/bash)
+                run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+            -   name: CodeCov
+                uses: codecov/codecov-action@v2
+    lint:
+        name: Lint project using GolangCI Lint
+        runs-on: ubuntu-latest
+        needs: test
+        steps:
+            -   name: Check out code into the Go module directory
+                uses: actions/checkout@v1
+            -   name: GolangCI-Lint Action
+                uses: golangci/golangci-lint-action@v2.5.2
+                with:
+                    version: latest
+                    only-new-issues: true
+                    args: --issues-exit-code=0
+    goreadme:
+        runs-on: ubuntu-latest
+        needs: [codecov, lint]
+        steps:
+        - name: Check out repository
+          uses: actions/checkout@v2
+        - name: Update readme according to Go doc
+          uses: posener/goreadme@v1
+          with:
+            badge-codecov: 'true'
+            badge-godoc: 'true'
+            email: 'justin@dynam.ac'
+            title: 'Go-DCDCUSB'
+            github-token: '${{ secrets.GITHUB_TOKEN }}'
