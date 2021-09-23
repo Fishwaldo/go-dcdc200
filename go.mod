@@ -1,6 +1,6 @@
 module github.com/Fishwaldo/go-dcdc200
 
-go 1.17
+go 1.13
 
 require (
 	github.com/Fishwaldo/go-logadapter v0.0.2
