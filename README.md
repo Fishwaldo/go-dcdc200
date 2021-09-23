@@ -1,4 +1,4 @@
-# Go-DCDCUSB
+# Go-LogAdapter
 
 [![codecov](https://codecov.io/gh/Fishwaldo/go-dcdcusb200/branch/master/graph/badge.svg)](https://codecov.io/gh/Fishwaldo/go-dcdcusb200)
 [![GoDoc](https://img.shields.io/badge/pkg.go.dev-doc-blue)](http://pkg.go.dev/github.com/Fishwaldo/go-dcdcusb200)
