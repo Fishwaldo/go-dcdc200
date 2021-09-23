@@ -190,15 +190,15 @@ func (dc *DcDcUSB) Close() {
 
 // Gets All current Params from the DCDCUSB power Supply. 
 // Set a Timeout/Deadline Context to cancel slow calls
-func (dc *DcDcUSB) GetAllParam(ctx context.Context) {
+func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params) {
 	if dc.intf == nil {
 		dc.log.Warn("Interface Not Opened")
-		return
+		return Params{}
 	}
 	outp, err := dc.intf.OutEndpoint(0x01)
 	if err != nil {
 		dc.log.Warn("Can't Get OutPoint: %s", err)
-		return
+		return Params{}
 	}
 	//log.Printf("OutEndpoint: %v", outp)
 	var send = make([]byte, 24)
@@ -208,13 +208,13 @@ func (dc *DcDcUSB) GetAllParam(ctx context.Context) {
 	len, err := outp.WriteContext(ctx, send)
 	if err != nil {
 		dc.log.Warn("Cant Send GetAllValues Command: %s (%v) - %d", err, send, len)
-		return
+		return Params{}
 	}
 	//log.Printf("Sent %d Bytes", len)
 	inp, err := dc.intf.InEndpoint(0x81)
 	if err != nil {
 		dc.log.Warn("Can't Get OutPoint: %s", err)
-		return
+		return Params{}
 	}
 	//log.Printf("InEndpoint: %v", inp)
 
@@ -222,11 +222,12 @@ func (dc *DcDcUSB) GetAllParam(ctx context.Context) {
 	len, err = inp.ReadContext(ctx, recv)
 	if err != nil {
 		dc.log.Warn("Can't Read GetAllValues Command: %s", err)
-		return
+		return Params{}
 	}
 	//log.Printf("Got %d Bytes", len)
 	dc.log.Trace("Got %v", recv)
-	dc.parseAllValues(recv, len)
+	params, _ := dc.parseAllValues(recv, len)
+	return params
 }
 
 //                                                0   1  2  3  4  5  6   7   8   9 10 11 12 13 14 15 16 17 18 19  20 21 22   23
