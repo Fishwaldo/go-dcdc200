@@ -43,76 +43,77 @@ type DcDcUSB struct {
 	done     func()
 	log      logadapter.Logger
 	initOnce sync.Once
+	connected bool
 }
 
 // Represents the Settings for Off and Hardoff Delays when power is lost
 type TimerConfigt struct {
 	// After Ignition Lost, this the time waiting till we toggle the Power Switch I/F
-	OffDelay time.Duration `json:"off_delay,omitempty"`
+	OffDelay time.Duration `json:"off_delay"`
 	// After the Power Switch I/F is toggled, this is the delay before we cut power
-	HardOff  time.Duration `json:"hard_off,omitempty"`
+	HardOff  time.Duration `json:"hard_off"`
 }
 
 // Status of Various Peripherals
 type Peripheralst struct {
 	// ??
-	OutSwVin   bool `json:"out_sw_vin,omitempty"`
+	OutSwVin   bool `json:"out_sw_vin"`
 	// ??
-	OutPsw     bool `json:"out_psw,omitempty"`
+	OutPsw     bool `json:"out_psw"`
 	// ??
-	OutStartOutput bool `json:"out_start_output,omitempty"`
+	OutStartOutput bool `json:"out_start_output"`
 	// Status of the Onboard Led
-	OutLed     bool `json:"out_led,omitempty"`
+	OutLed     bool `json:"out_led"`
 	// If the VOut is within range. 
-	InVoutGood bool `json:"in_vout_good,omitempty"`
+	InVoutGood bool `json:"in_vout_good"`
 }
 
 // Overall Status of the DCDCUSB Power Supply
 type Params struct {
 	// What the Vout Setting is configured for
-	VoutSet      float32      `json:"vout_set,omitempty"`
+	VoutSet      float32      `json:"vout_set"`
 	// What Voltage the Config Jumpers are set for VOut
-	VoutConfig   float32      `json:"vout_config,omitempty"`
+	VoutConfig   float32      `json:"vout_config"`
 	// The Input Voltage
-	Vin          float32      `json:"vin,omitempty"`
+	Vin          float32      `json:"vin"`
 	// The Ignition Voltage
-	Vign         float32      `json:"vign,omitempty"`
+	Vign         float32      `json:"vign"`
 	// What the Actual VOut Voltage is
-	VoutActual   float32      `json:"vout_actual,omitempty"`
+	VoutActual   float32      `json:"vout_actual"`
 	// Status of Various Peripherals
-	Peripherals  Peripheralst `json:"peripherals,omitempty"`
+	Peripherals  Peripheralst `json:"peripherals"`
 	// ?? (Not Output Enabled?)
-	Output       bool         `json:"output,omitempty"`
+	Output       bool         `json:"output"`
 	// ??
-	AuxVIn       bool         `json:"aux_v_in,omitempty"`
+	AuxVIn       bool         `json:"aux_v_in"`
 	// Firmware Version?
-	Version      string       `json:"version,omitempty"`
+	Version      string       `json:"version"`
 	// State of the Power Supply
-	State        DcdcStatet   `json:"state,omitempty"`
+	State        DcdcStatet   `json:"state"`
 	// Config Registers (unknown)
-	CfgRegisters byte         `json:"cfg_registers,omitempty"`
+	CfgRegisters byte         `json:"cfg_registers"`
 	// Voltage Flags (Unknown)
-	VoltFlags    byte         `json:"volt_flags,omitempty"`
+	VoltFlags    byte         `json:"volt_flags"`
 	// Timer Flags (Unknown)
-	TimerFlags   byte         `json:"timer_flags,omitempty"`
+	TimerFlags   byte         `json:"timer_flags"`
 	// The configured countdown times for the Timer upon Power Loss
-	TimerConfig TimerConfigt `json:"timer_config,omitempty"`
+	TimerConfig TimerConfigt `json:"timer_config"`
 	// Current Power Loss Debounce Timer
-	TimerWait     time.Duration `json:"timer_wait,omitempty"`
+	TimerWait     time.Duration `json:"timer_wait"`
 	// Current VOut Countdown Timer
-	TimerVOut     time.Duration `json:"timer_v_out,omitempty"`
+	TimerVOut     time.Duration `json:"timer_v_out"`
 	// Current VAux Countdown timer
-	TimerVAux     time.Duration `json:"timer_v_aux,omitempty"`
+	TimerVAux     time.Duration `json:"timer_v_aux"`
 	// Current Power Switch Toggle Count Down Timer
-	TimerPRWSW    time.Duration `json:"timer_prwsw,omitempty"`
+	TimerPRWSW    time.Duration `json:"timer_prwsw"`
 	// Current Soft Off Countdown Timer
-	TimerSoftOff  time.Duration `json:"timer_soft_off,omitempty"`
+	TimerSoftOff  time.Duration `json:"timer_soft_off"`
 	// Current Hard Off Countdown Timer
-	TimerHardOff  time.Duration `json:"timer_hard_off,omitempty"`
+	TimerHardOff  time.Duration `json:"timer_hard_off"`
 	// Current Script Position 
-	ScriptPointer byte          `json:"script_pointer,omitempty"`
+	ScriptPointer byte          `json:"script_pointer"`
 	// Current Operating Mode
-	Mode          DcdcModet     `json:"mode,omitempty"`
+	Mode          DcdcModet     `json:"mode"`
 }
 // Initialize the DCDCUSB Communications. Should be first function called before any other methods are called
 func (dc *DcDcUSB) Init() {
@@ -123,6 +124,7 @@ func (dc *DcDcUSB) Init() {
 			dc.log = templogger
 		}
 	})
+	dc.connected = false
 	dc.ctx = gousb.NewContext()
 }
 
@@ -137,6 +139,10 @@ func (dc *DcDcUSB) SetUSBDebug(level int) {
 	if dc.ctx != nil {
 		dc.ctx.Debug(level)
 	}
+}
+// Returns if we are connected to the Power Supply
+func (dc *DcDcUSB) IsConnected() (bool) {
+	return dc.connected
 }
 
 // Scan for a DCDCUSB connection, returns true if found, or false (and optional error) if there
@@ -173,6 +179,7 @@ func (dc *DcDcUSB) Scan() (bool, error) {
 	}
 	dc.log.Trace("Interface: %s", dc.intf.String())
 	dc.log = dc.log.With("Device", dc.intf.String())
+	dc.connected = true
 	return true, nil
 }
 func (dc *DcDcUSB) Close() {
@@ -186,19 +193,20 @@ func (dc *DcDcUSB) Close() {
 	if dc.ctx != nil {
 		dc.ctx.Close()
 	}
+	dc.connected = false;
 }
 
 // Gets All current Params from the DCDCUSB power Supply. 
 // Set a Timeout/Deadline Context to cancel slow calls
-func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params) {
+func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params, error) {
 	if dc.intf == nil {
 		dc.log.Warn("Interface Not Opened")
-		return Params{}
+		return Params{}, fmt.Errorf("Interface Not Opened")
 	}
 	outp, err := dc.intf.OutEndpoint(0x01)
 	if err != nil {
-		dc.log.Warn("Can't Get OutPoint: %s", err)
-		return Params{}
+		dc.log.Warn("Can't Get OutEndPoint: %s", err)
+		return Params{}, err
 	}
 	//log.Printf("OutEndpoint: %v", outp)
 	var send = make([]byte, 24)
@@ -208,13 +216,13 @@ func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params) {
 	len, err := outp.WriteContext(ctx, send)
 	if err != nil {
 		dc.log.Warn("Cant Send GetAllValues Command: %s (%v) - %d", err, send, len)
-		return Params{}
+		return Params{}, err
 	}
 	//log.Printf("Sent %d Bytes", len)
 	inp, err := dc.intf.InEndpoint(0x81)
 	if err != nil {
 		dc.log.Warn("Can't Get OutPoint: %s", err)
-		return Params{}
+		return Params{}, err
 	}
 	//log.Printf("InEndpoint: %v", inp)
 
@@ -222,12 +230,12 @@ func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params) {
 	len, err = inp.ReadContext(ctx, recv)
 	if err != nil {
 		dc.log.Warn("Can't Read GetAllValues Command: %s", err)
-		return Params{}
+		return Params{}, err
 	}
 	//log.Printf("Got %d Bytes", len)
 	dc.log.Trace("Got %v", recv)
-	params, _ := dc.parseAllValues(recv, len)
-	return params
+	params, err := dc.parseAllValues(recv, len)
+	return params, err
 }
 
 //                                                0   1  2  3  4  5  6   7   8   9 10 11 12 13 14 15 16 17 18 19  20 21 22   23
