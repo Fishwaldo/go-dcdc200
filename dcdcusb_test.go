@@ -27,13 +27,14 @@ package dcdcusb
 import (
 	"testing"
 	"time"
+	"github.com/Fishwaldo/go-logadapter/loggers/std"
 )
 
 func TestParseAllValues(t *testing.T) {
 	var test1 = []byte{130, 133, 7,  76, 75, 43, 27, 133, 215, 251,  1,  0,  0,  0,  0,  0,  0,  0,  0,  3,  68,  0,  0,  167}
 	dc := DcDcUSB{}
-	dc.Init()
-	result, err := dc.parseAllValues(test1, 24)
+	dc.Init(stdlogger.DefaultLogger(), false)
+	result, err := dc.parseAllValues(test1)
 	if err != nil {
 		t.Fatalf("Error Returned from parseAllValues: %v", err)
 	}
@@ -108,8 +109,8 @@ func TestParseAllValues(t *testing.T) {
 func TestParseAllValues2(t *testing.T) {
 	var test1 = []byte{130, 133, 8,  76, 0,  43, 27, 133, 205, 251,  1,  0,  0,  0,  0,  0,  0,  0,  0,  3, 127,  0,  0,  167}
 	dc := DcDcUSB{}
-	dc.Init()
-	result, err := dc.parseAllValues(test1, 24)
+	dc.Init(stdlogger.DefaultLogger(), false)
+	result, err := dc.parseAllValues(test1)
 	if err != nil {
 		t.Fatalf("Error Returned from parseAllValues: %v", err)
 	}
@@ -184,8 +185,8 @@ func TestParseAllValues2(t *testing.T) {
 func TestParseAllValues3(t *testing.T) {
 	var test1 = []byte{130, 133, 8,  76, 0,  44, 25, 133, 205, 251,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0,  0,  0,  167}
 	dc := DcDcUSB{}
-	dc.Init()
-	result, err := dc.parseAllValues(test1, 24)
+	dc.Init(stdlogger.DefaultLogger(), false)
+	result, err := dc.parseAllValues(test1)
 	if err != nil {
 		t.Fatalf("Error Returned from parseAllValues: %v", err)
 	}
@@ -259,8 +260,8 @@ func TestParseAllValues3(t *testing.T) {
 func TestParseAllValues4(t *testing.T) {
 	var test1 = []byte{130, 133, 16, 76, 0,  44, 27, 133, 205, 247,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0,  0, 59,  167}
 	dc := DcDcUSB{}
-	dc.Init()
-	result, err := dc.parseAllValues(test1, 24)
+	dc.Init(stdlogger.DefaultLogger(),false)
+	result, err := dc.parseAllValues(test1)
 	if err != nil {
 		t.Fatalf("Error Returned from parseAllValues: %v", err)
 	}
@@ -335,8 +336,8 @@ func TestParseAllValues4(t *testing.T) {
 func TestParseAllValues5(t *testing.T) {
 	var test1 = []byte{130, 133, 16, 76, 0,  44,  9, 133, 205, 247,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,   0,  0,  0,  167}
 	dc := DcDcUSB{}
-	dc.Init()
-	result, err := dc.parseAllValues(test1, 24)
+	dc.Init(stdlogger.DefaultLogger(), false)
+	result, err := dc.parseAllValues(test1)
 	if err != nil {
 		t.Fatalf("Error Returned from parseAllValues: %v", err)
 	}

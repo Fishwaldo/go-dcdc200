@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/Fishwaldo/go-dcdc200"
+	"github.com/Fishwaldo/go-logadapter/loggers/std"
 )
 
 func Example() {
 	dc := dcdcusb.DcDcUSB{}
-	dc.Init()
+	dc.Init(stdlogger.DefaultLogger(), false)
 	if ok, err := dc.Scan(); !ok {
 		log.Fatalf("Scan Failed: %v", err)
 		return

@@ -1,4 +1,4 @@
-/* 
+/*
 MIT License
 
 Copyright (c) 2021 Justin Hammond
@@ -28,22 +28,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
+	"os"
 	"time"
 
+	"github.com/Fishwaldo/go-dcdc200/internal"
+	"github.com/Fishwaldo/go-dcdc200/internal/realusb"
+	"github.com/Fishwaldo/go-dcdc200/internal/sim"
 	"github.com/Fishwaldo/go-logadapter"
-	"github.com/Fishwaldo/go-logadapter/loggers/std"
-	"github.com/google/gousb"
 )
+
+type usbifI interface {
+	SetUSBDebug(level int)
+	Scan() (bool, error)
+	Close()
+	GetAllParam(ctx context.Context) ([]byte, int, error)
+}
+
 // Main Structure for the DCDCUSB Communications
 type DcDcUSB struct {
-	ctx      *gousb.Context
-	dev      *gousb.Device
-	intf     *gousb.Interface
-	done     func()
-	log      logadapter.Logger
-	initOnce sync.Once
-	connected bool
+	log         logadapter.Logger
+	connected   bool
+	captureData bool
+	simulation  bool
+	usbif       usbifI
 }
 
 // Represents the Settings for Off and Hardoff Delays when power is lost
@@ -51,190 +58,143 @@ type TimerConfigt struct {
 	// After Ignition Lost, this the time waiting till we toggle the Power Switch I/F
 	OffDelay time.Duration `json:"off_delay"`
 	// After the Power Switch I/F is toggled, this is the delay before we cut power
-	HardOff  time.Duration `json:"hard_off"`
+	HardOff time.Duration `json:"hard_off"`
 }
 
 // Status of Various Peripherals
 type Peripheralst struct {
 	// ??
-	OutSwVin   bool `json:"out_sw_vin"`
+	OutSwVin bool `json:"out_sw_vin"`
 	// ??
-	OutPsw     bool `json:"out_psw"`
+	OutPsw bool `json:"out_psw"`
 	// ??
 	OutStartOutput bool `json:"out_start_output"`
 	// Status of the Onboard Led
-	OutLed     bool `json:"out_led"`
-	// If the VOut is within range. 
+	OutLed bool `json:"out_led"`
+	// If the VOut is within range.
 	InVoutGood bool `json:"in_vout_good"`
 }
 
 // Overall Status of the DCDCUSB Power Supply
 type Params struct {
 	// What the Vout Setting is configured for
-	VoutSet      float32      `json:"vout_set"`
+	VoutSet float32 `json:"vout_set"`
 	// What Voltage the Config Jumpers are set for VOut
-	VoutConfig   float32      `json:"vout_config"`
+	VoutConfig float32 `json:"vout_config"`
 	// The Input Voltage
-	Vin          float32      `json:"vin"`
+	Vin float32 `json:"vin"`
 	// The Ignition Voltage
-	Vign         float32      `json:"vign"`
+	Vign float32 `json:"vign"`
 	// What the Actual VOut Voltage is
-	VoutActual   float32      `json:"vout_actual"`
+	VoutActual float32 `json:"vout_actual"`
 	// Status of Various Peripherals
-	Peripherals  Peripheralst `json:"peripherals"`
+	Peripherals Peripheralst `json:"peripherals"`
 	// ?? (Not Output Enabled?)
-	Output       bool         `json:"output"`
+	Output bool `json:"output"`
 	// ??
-	AuxVIn       bool         `json:"aux_v_in"`
+	AuxVIn bool `json:"aux_v_in"`
 	// Firmware Version?
-	Version      string       `json:"version"`
+	Version string `json:"version"`
 	// State of the Power Supply
-	State        DcdcStatet   `json:"state"`
+	State DcdcStatet `json:"state"`
 	// Config Registers (unknown)
-	CfgRegisters byte         `json:"cfg_registers"`
+	CfgRegisters byte `json:"cfg_registers"`
 	// Voltage Flags (Unknown)
-	VoltFlags    byte         `json:"volt_flags"`
+	VoltFlags byte `json:"volt_flags"`
 	// Timer Flags (Unknown)
-	TimerFlags   byte         `json:"timer_flags"`
+	TimerFlags byte `json:"timer_flags"`
 	// The configured countdown times for the Timer upon Power Loss
 	TimerConfig TimerConfigt `json:"timer_config"`
 	// Current Power Loss Debounce Timer
-	TimerWait     time.Duration `json:"timer_wait"`
+	TimerWait time.Duration `json:"timer_wait"`
 	// Current VOut Countdown Timer
-	TimerVOut     time.Duration `json:"timer_v_out"`
+	TimerVOut time.Duration `json:"timer_v_out"`
 	// Current VAux Countdown timer
-	TimerVAux     time.Duration `json:"timer_v_aux"`
+	TimerVAux time.Duration `json:"timer_v_aux"`
 	// Current Power Switch Toggle Count Down Timer
-	TimerPRWSW    time.Duration `json:"timer_prwsw"`
+	TimerPRWSW time.Duration `json:"timer_prwsw"`
 	// Current Soft Off Countdown Timer
-	TimerSoftOff  time.Duration `json:"timer_soft_off"`
+	TimerSoftOff time.Duration `json:"timer_soft_off"`
 	// Current Hard Off Countdown Timer
-	TimerHardOff  time.Duration `json:"timer_hard_off"`
-	// Current Script Position 
-	ScriptPointer byte          `json:"script_pointer"`
+	TimerHardOff time.Duration `json:"timer_hard_off"`
+	// Current Script Position
+	ScriptPointer byte `json:"script_pointer"`
 	// Current Operating Mode
-	Mode          DcdcModet     `json:"mode"`
-}
-// Initialize the DCDCUSB Communications. Should be first function called before any other methods are called
-func (dc *DcDcUSB) Init() {
-	dc.initOnce.Do(func() {
-		if dc.log == nil {
-			templogger := stdlogger.DefaultLogger()
-			templogger.Log.SetPrefix("DCDCUSB")
-			dc.log = templogger
-		}
-	})
-	dc.connected = false
-	dc.ctx = gousb.NewContext()
+	Mode DcdcModet `json:"mode"`
 }
 
-// Set a Custom Logger based on https://github.com/Fishwaldo/go-logadapter
-// If not set, then the Library will use the Std Library Logger
-func (dc *DcDcUSB) SetLogger(log logadapter.Logger) {
+// Initialize the DCDCUSB Communications. Should be first function called before any other methods are called
+// Pass a logadapter.Logger as the logger for this package and set simulation to true if you wish to reply a Captured Session instead of
+// live data.
+func (dc *DcDcUSB) Init(log logadapter.Logger, simulation bool) {
 	dc.log = log
+	dc.connected = false
+	dc.simulation = simulation
+	if !simulation {
+		dc.usbif = realusb.Init(dc.log)
+	} else {
+		dc.usbif = sim.Init(dc.log)
+	}
+}
+
+// Capture Data from the Power Supply and save it to dcdcusb.txt for replay via the simulator later
+func (dc *DcDcUSB) SetCapture(enabled bool) {
+	dc.captureData = true
 }
 
 // Set the debug level for the GoUSB Library
 func (dc *DcDcUSB) SetUSBDebug(level int) {
-	if dc.ctx != nil {
-		dc.ctx.Debug(level)
-	}
+	dc.usbif.SetUSBDebug(level)
 }
+
 // Returns if we are connected to the Power Supply
-func (dc *DcDcUSB) IsConnected() (bool) {
+func (dc *DcDcUSB) IsConnected() bool {
 	return dc.connected
 }
 
 // Scan for a DCDCUSB connection, returns true if found, or false (and optional error) if there
-// was a failure setting up communications with it. 
+// was a failure setting up communications with it.
 func (dc *DcDcUSB) Scan() (bool, error) {
 	var err error
-	dc.dev, err = dc.ctx.OpenDeviceWithVIDPID(dcdc200_vid, dcdc200_pid)
-	if err != nil {
-		dc.log.Warn("Could Not Open Device: %v", err)
-		dc.Close()
-		return false, err
-	}
-	if dc.dev == nil {
-		dc.log.Warn("Can't Find Device")
-		dc.Close()
-		return false, nil
-	}
-	err = dc.dev.SetAutoDetach(true)
-	if err != nil {
-		dc.log.Error("%s.SetAutoDetach(true): %v", dc.dev, err)
-	}
-
-	confignum, _ := dc.dev.ActiveConfigNum()
-	dc.log.Trace("Device Config: %s %d", dc.dev.String(), confignum)
-	//	desc, _ := dc.dev.GetStringDescriptor(1)
-	//	manu, _ := dc.dev.Manufacturer()
-	//	prod, _ := dc.dev.Product()
-	//	serial, _ := dc.dev.SerialNumber()
-	dc.intf, dc.done, err = dc.dev.DefaultInterface()
-	if err != nil {
-		dc.log.Error("%s.Interface(): %v", dc.dev, err)
-		dc.Close()
-		return false, err
-	}
-	dc.log.Trace("Interface: %s", dc.intf.String())
-	dc.log = dc.log.With("Device", dc.intf.String())
-	dc.connected = true
-	return true, nil
+	dc.connected, err = dc.usbif.Scan()
+	return dc.connected, err
 }
 func (dc *DcDcUSB) Close() {
-	if dc.intf != nil {
-		dc.done()
-		dc.intf.Close()
-	}
-	if dc.dev != nil {
-		dc.dev.Close()
-	}
-	if dc.ctx != nil {
-		dc.ctx.Close()
-	}
-	dc.connected = false;
+	dc.usbif.Close()
+	dc.connected = false
 }
 
-// Gets All current Params from the DCDCUSB power Supply. 
+// Gets All current Params from the DCDCUSB power Supply.
 // Set a Timeout/Deadline Context to cancel slow calls
 func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params, error) {
-	if dc.intf == nil {
-		dc.log.Warn("Interface Not Opened")
-		return Params{}, fmt.Errorf("Interface Not Opened")
-	}
-	outp, err := dc.intf.OutEndpoint(0x01)
+	recv, len, err := dc.usbif.GetAllParam(ctx)
 	if err != nil {
-		dc.log.Warn("Can't Get OutEndPoint: %s", err)
+		dc.log.Warn("GetAllParams Call Failed: %s", err)
 		return Params{}, err
 	}
-	//log.Printf("OutEndpoint: %v", outp)
-	var send = make([]byte, 24)
-	send[0] = cmdGetAllValues
-	//send = append(send, 0)
-	//log.Printf("About to Send %v", send)
-	len, err := outp.WriteContext(ctx, send)
-	if err != nil {
-		dc.log.Warn("Cant Send GetAllValues Command: %s (%v) - %d", err, send, len)
-		return Params{}, err
+	if len != 24 {
+		dc.log.Warn("Got Short Read From USB")
+		return Params{}, fmt.Errorf("got Short Read from USB")
 	}
-	//log.Printf("Sent %d Bytes", len)
-	inp, err := dc.intf.InEndpoint(0x81)
-	if err != nil {
-		dc.log.Warn("Can't Get OutPoint: %s", err)
-		return Params{}, err
-	}
-	//log.Printf("InEndpoint: %v", inp)
 
-	var recv = make([]byte, 24)
-	len, err = inp.ReadContext(ctx, recv)
-	if err != nil {
-		dc.log.Warn("Can't Read GetAllValues Command: %s", err)
-		return Params{}, err
+	if dc.captureData {
+		if dc.simulation {
+			dc.log.Warn("Running in Simulation Mode, Can't Capture")
+		} else {
+			f, err := os.OpenFile("dcdcusb.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				dc.log.Fatal("Can't open File for Capture: %s", err)
+			}
+
+			if _, err := f.Write(recv); err != nil {
+				dc.log.Fatal("Can't write Text to File: %s", err)
+			}
+			f.Close()
+		}
 	}
-	//log.Printf("Got %d Bytes", len)
+
 	dc.log.Trace("Got %v", recv)
-	params, err := dc.parseAllValues(recv, len)
+	params, err := dc.parseAllValues(recv)
 	return params, err
 }
 
@@ -245,9 +205,9 @@ func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params, error) {
 //                     2021/09/20 16:12:54 Got [130 133 8  76 0  44 25 133 205 251  1  0  0  0  0  0  0  0  0  0   0  0  0  167]
 //                     2021/09/20 16:12:56 Got [130 133 16 76 0  44 27 133 205 247  1  0  0  0  0  0  0  0  0  0   0  0 59  167]
 //                     2021/09/20 16:13:54 Got [130 133 16 76 0  44  9 133 205 247  1  0  0  0  0  0  0  0  0  0   0  0  0  167]
-func (dc *DcDcUSB) parseAllValues(buf []byte, len int) (Params, error) {
+func (dc *DcDcUSB) parseAllValues(buf []byte) (Params, error) {
 	switch buf[0] {
-	case cmdRecvAllValues:
+	case internal.CmdRecvAllValues:
 		param := Params{}
 		param.Mode = dc.modeToConst((buf[1] >> 6) & 0x7)
 		param.VoutConfig = dc.voutConfigtoFloat((buf[1] >> 2) & 0x07)
@@ -351,8 +311,8 @@ func (dc DcDcUSB) stateToConst(state byte) DcdcStatet {
 func (dc DcDcUSB) peripheralsState(state byte) Peripheralst {
 	p := Peripheralst{
 		InVoutGood:     ((state & 0x01) != 0),
-		OutLed:          ((state & 0x02) != 0),
-		OutPsw:          ((state & 0x04) != 0),
+		OutLed:         ((state & 0x02) != 0),
+		OutPsw:         ((state & 0x04) != 0),
 		OutStartOutput: ((state & 0x08) != 0),
 		OutSwVin:       ((state & 0x10) != 0),
 	}

@@ -1,4 +1,4 @@
-/* 
+/*
 MIT License
 
 Copyright (c) 2021 Justin Hammond
@@ -26,26 +26,55 @@ package main
 
 import (
 	"context"
-	"log"
+	"flag"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/Fishwaldo/go-dcdc200"
+	"github.com/Fishwaldo/go-dcdc200/internal/sim"
+	"github.com/Fishwaldo/go-logadapter/loggers/std"
 )
 
 
 func main() {
+	var simulation = flag.Bool("s", false, "Enable Simulation Mode")
+	var capture = flag.Bool("c", false, "Enable Packet Capture")
+	var help = flag.Bool("h", false, "Help")
+	flag.Parse()
+	if *help {
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
 	dc := dcdcusb.DcDcUSB{}
-	dc.Init()
+	if *simulation {
+		if err := sim.SetCaptureFile("dcdcusb.txt"); err != nil {
+			fmt.Printf("Can't open Capture File dcdcusb.txt: %s\n", err)
+			os.Exit(-1)
+		}
+	}
+	dc.Init(stdlogger.DefaultLogger(), *simulation)
+
+	if *capture {
+		if *simulation {
+			fmt.Printf("Can't Enable Capture in Simulation Mode\n")
+			os.Exit(-1)
+		}
+		dc.SetCapture(*capture)
+	}
+
+	
 	if ok, err := dc.Scan(); !ok {
-		log.Fatalf("Scan Failed: %v", err)
-		return
+		fmt.Printf("Scan Failed: %v\n", err)
+		os.Exit(-1)
 	}
 	defer dc.Close()
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1000000; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), (1 * time.Second))
 		dc.GetAllParam(ctx)
 		cancel()
 		time.Sleep(1 * time.Second)
 	}
-	dc.Close()
+	os.Exit(0)
 }

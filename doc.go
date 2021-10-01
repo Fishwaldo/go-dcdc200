@@ -30,5 +30,10 @@ it depends upon GoUSB which in turn depends upon the libusb C library, thus CGO 
 
 Please see the GoUSB pages for hints on compiling for platforms other than linux
 
+Building
+
+Compile with the tag nogousb to disable compiling with USB Support. Then the only option available
+is a Simulator Mode that replays a previously captured session.
+
 */
 package dcdcusb
