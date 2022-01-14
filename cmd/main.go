@@ -49,8 +49,8 @@ func main() {
 
 	dc := dcdcusb.DcDcUSB{}
 	if *simulation {
-		if err := sim.SetCaptureFile("dcdcusb.txt"); err != nil {
-			fmt.Printf("Can't open Capture File dcdcusb.txt: %s\n", err)
+		if err := sim.SetCaptureFile("dcdcusb.cap"); err != nil {
+			fmt.Printf("Can't open Capture File dcdcusb.cap: %s\n", err)
 			os.Exit(-1)
 		}
 	}

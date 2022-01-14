@@ -133,6 +133,7 @@ func (dc *DcDcUSB) Init(log logadapter.Logger, simulation bool) {
 	if !simulation {
 		dc.usbif = realusb.Init(dc.log)
 	} else {
+		sim.SetCaptureFile("dcdcusb.cap")
 		dc.usbif = sim.Init(dc.log)
 	}
 }
