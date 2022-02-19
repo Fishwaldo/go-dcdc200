@@ -33,13 +33,15 @@ import (
 
 	"github.com/Fishwaldo/go-dcdc200"
 	"github.com/Fishwaldo/go-dcdc200/internal/sim"
-	"github.com/Fishwaldo/go-logadapter/loggers/std"
+    "github.com/bombsimon/logrusr/v2"
+	"github.com/sirupsen/logrus"
 )
 
 
 func main() {
 	var simulation = flag.Bool("s", false, "Enable Simulation Mode")
 	var capture = flag.Bool("c", false, "Enable Packet Capture")
+	var debug = flag.Bool("d", false, "Enable Debug Mode")
 	var help = flag.Bool("h", false, "Help")
 	flag.Parse()
 	if *help {
@@ -54,8 +56,14 @@ func main() {
 			os.Exit(-1)
 		}
 	}
-	dc.Init(stdlogger.DefaultLogger(), *simulation)
+	logsink := logrus.New()
+	if *debug { 
+		logsink.SetLevel(logrus.TraceLevel)
+	}
 
+	log := logrusr.New(logsink)
+	dc.Init(log, *simulation)
+	log.V(2).Info("Debug Enabled")
 	if *capture {
 		if *simulation {
 			fmt.Printf("Can't Enable Capture in Simulation Mode\n")

@@ -34,7 +34,7 @@ import (
 	"github.com/Fishwaldo/go-dcdc200/internal"
 	"github.com/Fishwaldo/go-dcdc200/internal/realusb"
 	"github.com/Fishwaldo/go-dcdc200/internal/sim"
-	"github.com/Fishwaldo/go-logadapter"
+	"github.com/go-logr/logr"
 )
 
 type usbifI interface {
@@ -46,7 +46,7 @@ type usbifI interface {
 
 // Main Structure for the DCDCUSB Communications
 type DcDcUSB struct {
-	log         logadapter.Logger
+	log         logr.Logger
 	connected   bool
 	captureData bool
 	simulation  bool
@@ -124,16 +124,20 @@ type Params struct {
 }
 
 // Initialize the DCDCUSB Communications. Should be first function called before any other methods are called
-// Pass a logadapter.Logger as the logger for this package and set simulation to true if you wish to reply a Captured Session instead of
+// Pass a logr.Logger as the logger for this package and set simulation to true if you wish to reply a Captured Session instead of
 // live data.
-func (dc *DcDcUSB) Init(log logadapter.Logger, simulation bool) {
+func (dc *DcDcUSB) Init(log logr.Logger, simulation bool) {
 	dc.log = log
 	dc.connected = false
 	dc.simulation = simulation
 	if !simulation {
+		dc.log.Info("Enabling Real USB Mode")
 		dc.usbif = realusb.Init(dc.log)
 	} else {
-		sim.SetCaptureFile("dcdcusb.cap")
+		dc.log.Info("Enabling Simulation USB Mode")
+		if err := sim.SetCaptureFile("dcdcusb.cap"); err != nil {
+			dc.log.Error(err, "SetCaptureFile Failed", "file", "dcdcusb.cap")
+		}
 		dc.usbif = sim.Init(dc.log)
 	}
 }
@@ -170,31 +174,31 @@ func (dc *DcDcUSB) Close() {
 func (dc *DcDcUSB) GetAllParam(ctx context.Context) (Params, error) {
 	recv, len, err := dc.usbif.GetAllParam(ctx)
 	if err != nil {
-		dc.log.Warn("GetAllParams Call Failed: %s", err)
+		dc.log.V(2).Info("GetAllParams Call Failed", "error", err)
 		return Params{}, err
 	}
 	if len != 24 {
-		dc.log.Warn("Got Short Read From USB")
+		dc.log.Info("Got Short Read From USB", "len", len)
 		return Params{}, fmt.Errorf("got Short Read from USB")
 	}
 
 	if dc.captureData {
 		if dc.simulation {
-			dc.log.Warn("Running in Simulation Mode, Can't Capture")
+			dc.log.Error(nil, "Running in Simulation Mode, Can't Capture")
 		} else {
 			f, err := os.OpenFile("dcdcusb.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				dc.log.Fatal("Can't open File for Capture: %s", err)
+				dc.log.Error(err, "Can't open File for Capture")
 			}
 
 			if _, err := f.Write(recv); err != nil {
-				dc.log.Fatal("Can't write Text to File: %s", err)
+				dc.log.Error(err, "Can't write Text to File")
 			}
 			f.Close()
 		}
 	}
 
-	dc.log.Trace("Got %v", recv)
+	dc.log.V(3).Info("Got Data", "data", recv)
 	params, err := dc.parseAllValues(recv)
 	return params, err
 }
@@ -229,7 +233,7 @@ func (dc *DcDcUSB) parseAllValues(buf []byte) (Params, error) {
 		param.TimerPRWSW = dc.convertTime(buf[17:19])
 		param.TimerSoftOff = dc.convertTime(buf[19:21])
 		param.TimerHardOff = dc.convertTime(buf[21:23])
-		dc.log.Trace("DCDC Params: %+v\n", param)
+		dc.log.V(3).Info("DCDC Params", "params", param)
 		return param, nil
 	}
 	return Params{}, errors.New("unknown command recieved")

@@ -3,17 +3,21 @@ package dcdcusb_test
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/Fishwaldo/go-dcdc200"
-	"github.com/Fishwaldo/go-logadapter/loggers/std"
+	"github.com/go-logr/stdr"
 )
 
 func Example() {
 	dc := dcdcusb.DcDcUSB{}
-	dc.Init(stdlogger.DefaultLogger(), false)
+	logsink := log.New(os.Stdout, "", 0);
+	log := stdr.New(logsink)
+
+	dc.Init(log, false)
 	if ok, err := dc.Scan(); !ok {
-		log.Fatalf("Scan Failed: %v", err)
+		log.Error(err, "Scan Failed")
 		return
 	}
 	defer dc.Close()
