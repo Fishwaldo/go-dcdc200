@@ -24,9 +24,12 @@ is a Simulator Mode that replays a previously captured session.
 ```golang
 
 dc := dcdcusb.DcDcUSB{}
-dc.Init(stdlogger.DefaultLogger(), false)
+logsink := log.New(os.Stdout, "", 0)
+log := stdr.New(logsink)
+
+dc.Init(log, false)
 if ok, err := dc.Scan(); !ok {
-    log.Fatalf("Scan Failed: %v", err)
+    log.Error(err, "Scan Failed")
     return
 }
 defer dc.Close()
