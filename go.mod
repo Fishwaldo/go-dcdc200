@@ -7,7 +7,7 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/stdr v1.2.2
 	github.com/google/gousb v2.1.0+incompatible
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 )
 
-require golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e // indirect
+require golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
